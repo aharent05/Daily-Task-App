@@ -1,11 +1,31 @@
 import { useState, useEffect, useRef } from "react";
 
-// ─── Data Model ───────────────────────────────────────────────────────────────
-// { id, text, section, done, createdAt, completedAt }
-// localStorage key: "daytask_data" → { date: "YYYY-MM-DD", tasks: [...] }
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-const TODAY = () => new Date().toISOString().slice(0, 10);
-const uid = () => Math.random().toString(36).slice(2, 9);
+type Task = {
+  id: string;
+  text: string;
+  section: string;
+  done: boolean;
+  createdAt: number;
+  completedAt: number | null;
+};
+
+type ArchiveDay = {
+  date: string;
+  tasks: Task[];
+};
+
+type AppData = {
+  date: string;
+  tasks: Task[];
+  archive: ArchiveDay[];
+};
+
+// ─── Data Model ───────────────────────────────────────────────────────────────
+
+const TODAY = (): string => new Date().toISOString().slice(0, 10);
+const uid = (): string => Math.random().toString(36).slice(2, 9);
 
 const SECTIONS = [
   { id: "morning",   label: "Morning",   icon: "🌅", color: "#f59e0b" },
@@ -14,12 +34,11 @@ const SECTIONS = [
   { id: "general",   label: "General",   icon: "📋", color: "#10b981" },
 ];
 
-function loadData() {
+function loadData(): AppData {
   try {
     const raw = localStorage.getItem("daytask_data");
     if (!raw) return { date: TODAY(), tasks: [], archive: [] };
-    const data = JSON.parse(raw);
-    // Daily reset: archive yesterday's tasks, start fresh
+    const data: AppData = JSON.parse(raw);
     if (data.date !== TODAY()) {
       const archive = data.archive || [];
       archive.unshift({ date: data.date, tasks: data.tasks });
@@ -31,11 +50,12 @@ function loadData() {
   }
 }
 
-function saveData(data) {
+function saveData(data: AppData): void {
   localStorage.setItem("daytask_data", JSON.stringify(data));
 }
 
-// ─── Styles (injected once) ────────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const STYLE = `
   @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap');
 
@@ -64,7 +84,6 @@ const STYLE = `
     position: relative;
   }
 
-  /* ── Header ── */
   .header {
     padding: 36px 0 28px;
     border-bottom: 1px solid var(--border);
@@ -73,7 +92,6 @@ const STYLE = `
     justify-content: space-between;
     align-items: flex-end;
   }
-  .header-left {}
   .date-label {
     font-family: var(--mono);
     font-size: 11px;
@@ -105,7 +123,6 @@ const STYLE = `
     line-height: 1;
   }
 
-  /* ── Progress bar ── */
   .progress-wrap {
     height: 2px;
     background: var(--border);
@@ -120,15 +137,12 @@ const STYLE = `
     transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  /* ── Section ── */
   .section { margin-bottom: 40px; }
   .section-header {
     display: flex;
     align-items: center;
     gap: 10px;
     margin-bottom: 14px;
-    cursor: pointer;
-    user-select: none;
   }
   .section-icon { font-size: 14px; }
   .section-name {
@@ -150,7 +164,6 @@ const STYLE = `
     background: var(--border);
   }
 
-  /* ── Task ── */
   .task-list { display: flex; flex-direction: column; gap: 2px; }
 
   .task-item {
@@ -163,16 +176,13 @@ const STYLE = `
     border: 1px solid transparent;
     transition: all 0.15s ease;
     cursor: pointer;
-    group: true;
     position: relative;
   }
   .task-item:hover {
     background: var(--surface);
     border-color: var(--border);
   }
-  .task-item.done {
-    opacity: 0.4;
-  }
+  .task-item.done { opacity: 0.4; }
 
   .task-check {
     width: 18px;
@@ -230,16 +240,6 @@ const STYLE = `
   .task-item:hover .task-delete { opacity: 1; }
   .task-delete:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
 
-  /* ── Empty state ── */
-  .empty-section {
-    padding: 10px 16px;
-    font-size: 12px;
-    color: var(--muted);
-    font-style: italic;
-    opacity: 0.5;
-  }
-
-  /* ── Quick Add (inline per section) ── */
   .inline-add {
     display: flex;
     align-items: center;
@@ -276,7 +276,6 @@ const STYLE = `
   }
   .inline-add input::placeholder { color: var(--muted); opacity: 0.5; }
 
-  /* ── FAB ── */
   .fab {
     position: fixed;
     bottom: 32px;
@@ -302,7 +301,6 @@ const STYLE = `
   }
   .fab.open { transform: rotate(45deg); background: var(--accent2); box-shadow: 0 4px 24px rgba(241,53,200,0.3); }
 
-  /* ── Modal ── */
   .modal-backdrop {
     position: fixed; inset: 0;
     background: rgba(0,0,0,0.7);
@@ -404,7 +402,6 @@ const STYLE = `
   .btn.primary:hover { background: #d4f54d; }
   .btn.primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  /* ── Archive tab ── */
   .nav {
     display: flex;
     gap: 0;
@@ -430,7 +427,6 @@ const STYLE = `
   .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
   .nav-tab:hover:not(.active) { color: var(--text); }
 
-  /* ── Archive view ── */
   .archive-day { margin-bottom: 32px; }
   .archive-date {
     font-size: 10px;
@@ -477,7 +473,6 @@ const STYLE = `
     opacity: 0.4;
   }
 
-  /* ── Completion celebration ── */
   .all-done {
     text-align: center;
     padding: 32px 0;
@@ -492,12 +487,10 @@ const STYLE = `
   }
   .all-done-sub { font-size: 12px; color: var(--muted); margin-top: 6px; letter-spacing: 0.05em; }
 
-  /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
-  /* ── Task enter animation ── */
   .task-enter { animation: taskIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
   @keyframes taskIn {
     from { opacity: 0; transform: translateX(-8px); }
@@ -507,7 +500,7 @@ const STYLE = `
 
 // ─── Components ───────────────────────────────────────────────────────────────
 
-function CheckCircle({ checked, onClick }) {
+function CheckCircle({ checked, onClick }: { checked: boolean; onClick: () => void }) {
   return (
     <div
       className={`task-check${checked ? " checked" : ""}`}
@@ -516,7 +509,7 @@ function CheckCircle({ checked, onClick }) {
   );
 }
 
-function TaskItem({ task, onToggle, onDelete }) {
+function TaskItem({ task, onToggle, onDelete }: { task: Task; onToggle: () => void; onDelete: () => void }) {
   return (
     <div className={`task-item task-enter${task.done ? " done" : ""}`}>
       <CheckCircle checked={task.done} onClick={onToggle} />
@@ -526,9 +519,9 @@ function TaskItem({ task, onToggle, onDelete }) {
   );
 }
 
-function InlineAdd({ sectionId, onAdd }) {
-  const [val, setVal] = useState("");
-  const ref = useRef();
+function InlineAdd({ sectionId, onAdd }: { sectionId: string; onAdd: (text: string, section: string) => void }) {
+  const [val, setVal] = useState<string>("");
+  const ref = useRef<HTMLInputElement>(null);
 
   const submit = () => {
     const t = val.trim();
@@ -552,10 +545,10 @@ function InlineAdd({ sectionId, onAdd }) {
   );
 }
 
-function AddModal({ onAdd, onClose }) {
-  const [text, setText] = useState("");
-  const [section, setSection] = useState("general");
-  const ref = useRef();
+function AddModal({ onAdd, onClose }: { onAdd: (text: string, section: string) => void; onClose: () => void }) {
+  const [text, setText] = useState<string>("");
+  const [section, setSection] = useState<string>("general");
+  const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => { ref.current?.focus(); }, []);
 
@@ -598,20 +591,24 @@ function AddModal({ onAdd, onClose }) {
   );
 }
 
-function ArchiveView({ archive }) {
+function ArchiveView({ archive }: { archive: ArchiveDay[] }) {
   if (!archive.length) return <div className="empty-archive">No past days yet.</div>;
   return (
     <div>
-      {archive.map((day) => (
+      {archive.map((day: ArchiveDay) => (
         <div key={day.date} className="archive-day">
-          <div className="archive-date">{new Date(day.date + "T12:00:00").toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric" })}</div>
-          {day.tasks.length === 0 && <div style={{ color: "var(--muted)", fontSize: 12, paddingBottom: 8, opacity: 0.5 }}>No tasks recorded</div>}
-          {day.tasks.map((t) => (
+          <div className="archive-date">
+            {new Date(day.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+          </div>
+          {day.tasks.length === 0 && (
+            <div style={{ color: "var(--muted)", fontSize: 12, paddingBottom: 8, opacity: 0.5 }}>No tasks recorded</div>
+          )}
+          {day.tasks.map((t: Task) => (
             <div key={t.id} className={`archive-task${t.done ? " done-arc" : ""}`}>
               <div className={`archive-dot${t.done ? " done-arc" : ""}`} />
               {t.text}
               <span style={{ marginLeft: "auto", fontSize: 10, opacity: 0.4, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                {SECTIONS.find(s => s.id === t.section)?.label}
+                {SECTIONS.find((s) => s.id === t.section)?.label}
               </span>
             </div>
           ))}
@@ -624,20 +621,18 @@ function ArchiveView({ archive }) {
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [data, setData] = useState(() => loadData());
-  const [showModal, setShowModal] = useState(false);
-  const [tab, setTab] = useState("today");
+  const [data, setData] = useState<AppData>(() => loadData());
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [tab, setTab] = useState<string>("today");
 
-  // Persist on every change
   useEffect(() => { saveData(data); }, [data]);
 
-  // Midnight reset check
   useEffect(() => {
     const interval = setInterval(() => {
-      setData((prev) => {
+      setData((prev: AppData) => {
         if (prev.date !== TODAY()) {
           const archive = [{ date: prev.date, tasks: prev.tasks }, ...(prev.archive || [])].slice(0, 30);
-          const next = { date: TODAY(), tasks: [], archive };
+          const next: AppData = { date: TODAY(), tasks: [], archive };
           saveData(next);
           return next;
         }
@@ -647,27 +642,27 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const addTask = (text, section) => {
-    const task = { id: uid(), text, section, done: false, createdAt: Date.now(), completedAt: null };
-    setData((prev) => ({ ...prev, tasks: [...prev.tasks, task] }));
+  const addTask = (text: string, section: string) => {
+    const task: Task = { id: uid(), text, section, done: false, createdAt: Date.now(), completedAt: null };
+    setData((prev: AppData) => ({ ...prev, tasks: [...prev.tasks, task] }));
   };
 
-  const toggleTask = (id) => {
-    setData((prev) => ({
+  const toggleTask = (id: string) => {
+    setData((prev: AppData) => ({
       ...prev,
-      tasks: prev.tasks.map((t) =>
+      tasks: prev.tasks.map((t: Task) =>
         t.id === id ? { ...t, done: !t.done, completedAt: !t.done ? Date.now() : null } : t
       ),
     }));
   };
 
-  const deleteTask = (id) => {
-    setData((prev) => ({ ...prev, tasks: prev.tasks.filter((t) => t.id !== id) }));
+  const deleteTask = (id: string) => {
+    setData((prev: AppData) => ({ ...prev, tasks: prev.tasks.filter((t: Task) => t.id !== id) }));
   };
 
   const tasks = data.tasks;
   const total = tasks.length;
-  const done = tasks.filter((t) => t.done).length;
+  const done = tasks.filter((t: Task) => t.done).length;
   const pct = total === 0 ? 0 : Math.round((done / total) * 100);
   const allDone = total > 0 && done === total;
 
@@ -678,7 +673,6 @@ export default function App() {
     <>
       <style>{STYLE}</style>
       <div className="app">
-        {/* Header */}
         <div className="header">
           <div className="header-left">
             <div className="date-label">{dateStr} · Daily tasks</div>
@@ -690,7 +684,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Nav */}
         <div className="nav">
           <button className={`nav-tab${tab === "today" ? " active" : ""}`} onClick={() => setTab("today")}>Today</button>
           <button className={`nav-tab${tab === "archive" ? " active" : ""}`} onClick={() => setTab("archive")}>Archive</button>
@@ -700,12 +693,10 @@ export default function App() {
           <ArchiveView archive={data.archive || []} />
         ) : (
           <>
-            {/* Progress */}
             <div className="progress-wrap">
               <div className="progress-bar" style={{ width: `${pct}%` }} />
             </div>
 
-            {/* All done celebration */}
             {allDone && (
               <div className="all-done">
                 <div className="all-done-emoji">✦</div>
@@ -714,10 +705,9 @@ export default function App() {
               </div>
             )}
 
-            {/* Sections */}
             {SECTIONS.map((sec) => {
-              const secTasks = tasks.filter((t) => t.section === sec.id);
-              const secDone = secTasks.filter((t) => t.done).length;
+              const secTasks = tasks.filter((t: Task) => t.section === sec.id);
+              const secDone = secTasks.filter((t: Task) => t.done).length;
               return (
                 <div key={sec.id} className="section">
                   <div className="section-header">
@@ -729,7 +719,7 @@ export default function App() {
                     )}
                   </div>
                   <div className="task-list">
-                    {secTasks.map((task) => (
+                    {secTasks.map((task: Task) => (
                       <TaskItem
                         key={task.id}
                         task={task}
@@ -743,7 +733,6 @@ export default function App() {
               );
             })}
 
-            {/* Empty state for new users */}
             {total === 0 && (
               <div style={{ textAlign: "center", padding: "20px 0 40px", fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 18, color: "var(--muted)", opacity: 0.5 }}>
                 What's on your plate today?
@@ -753,14 +742,12 @@ export default function App() {
         )}
       </div>
 
-      {/* FAB */}
       {tab === "today" && (
         <button className={`fab${showModal ? " open" : ""}`} onClick={() => setShowModal(!showModal)}>
           +
         </button>
       )}
 
-      {/* Modal */}
       {showModal && <AddModal onAdd={addTask} onClose={() => setShowModal(false)} />}
     </>
   );
